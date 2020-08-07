@@ -1,0 +1,249 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+##First Data Doc Tab: Social
+```{r}
+library(plyr)
+library(dplyr)
+getwd()
+
+##Input files from documents
+input_file <- read.csv("Renaissance_Data_8.4.20.csv", header=T)
+overall <- read.csv("Overall_Benchmarks_Ren.csv", header=T)
+
+##Check Column Names
+names(input_file)
+names(overall)
+
+##social (Renaissance) -- start selecting fields needed within the data doc, and filter for social
+social_v1 <- input_file %>% select(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, X1P.Targeting.Partner..Placement.MD., ï..1P.Targeting.Detail..Placement.MD., Additional.Targeting.Detail..Placement.Free.Form.MD., Creative.Format..Placement.MD., Creative.Format..Creative.MD., Feed.vs..Stories.vs..Type, Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.,Impressions, Clicks,Video.Completions,Post.Engagement, X_Spend..EUR.) %>% filter(Channel..Placement.MD. == "paidsocial")
+
+
+##social (Renaissance) -- aggregate data by requisite fields so data is NOT broken out by day
+social_ren <- social_v1 %>%  group_by(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, X1P.Targeting.Partner..Placement.MD., ï..1P.Targeting.Detail..Placement.MD., Additional.Targeting.Detail..Placement.Free.Form.MD., Creative.Format..Placement.MD., Creative.Format..Creative.MD., Feed.vs..Stories.vs..Type, Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.) %>%
+  summarise_all(funs(sum))
+
+
+##Add type of metric that qualifies as KPI based on objective
+social_ren$Type <- with(social_ren, ifelse(
+  Primary.KPI..Placement.MD.=='videoviews', 'VCR/CPCV',
+  ifelse(Primary.KPI..Placement.MD.=='traffic', 'CTR/CPC', 
+         ifelse(Primary.KPI..Placement.MD.=='engagement', 'ER/CPE', 'null'))))
+
+##Calculate KPI based on objective
+social_ren$Rate <- with(social_ren, ifelse(
+  Primary.KPI..Placement.MD.=='videoviews', round(Video.Completions/Impressions, digits = 2),
+  ifelse(Primary.KPI..Placement.MD.=='traffic', round(Clicks/Impressions, digits =2), 
+         ifelse(Primary.KPI..Placement.MD.=='engagement', round(Post.Engagement/Impressions, digits=2), 'null'))))
+
+##Calculate KPI based on cost-per
+social_ren$Cost.Per <- with(social_ren, ifelse(
+  Primary.KPI..Placement.MD.=='videoviews', round(X_Spend..EUR./Video.Completions, digits=2),
+  ifelse(Primary.KPI..Placement.MD.=='traffic', round(X_Spend..EUR./Clicks, digits=2), 
+         ifelse(Primary.KPI..Placement.MD.=='engagement', round(X_Spend..EUR./Post.Engagement, digits=2), 'null'))))
+
+##Test that file looks ok
+social_ren
+
+##Clean up column names
+library(plyr)
+
+social_ren$Channel..Placement.MD.
+
+social_ren <- rename_all(social_ren, recode, Channel..Placement.MD. = "Channel", Primary.KPI..Placement.MD.="Primary.KPI", X_Region..Clean.= "Region", X_Market.ISO.Code..Clean.= "Delivery.Market", Site.Name="Site.Name", X1P.Targeting.Partner..Placement.MD.= "1P.Targeting.Partner", ï..1P.Targeting.Detail..Placement.MD.= "1P.Targeting.Detail", Additional.Targeting.Detail..Placement.Free.Form.MD.="Additional.Detail", Creative.Format..Placement.MD.="Format", Creative.Format..Creative.MD.="Creative.Format", Phase..Creative.Free.Form.MD.="Phase", Presence.Of.Brand..Creative.Free.Form.MD.="Presence.of.brand", Call.To.Action..Creative.Free.Form.MD.="Call.To.Action",Size.Length..Creative.MD.= "Size.Length", Feed.vs..Stories.vs..Type="Feed.V.Stories", X_Spend..EUR.="Spend")
+  
+
+##Join benchmarks to social performance document
+
+
+mergeCols <- c("Delivery.Market", "Primary.KPI", "Site.Name")
+final_social_ren <- left_join(social_ren, overall, by = mergeCols)
+
+
+##Populate benchmarks based on campaign KPI
+final_social_ren$rate.bm <- with(final_social_ren, ifelse(Primary.KPI=='engagement', Engagement.Rate,
+                                                  ifelse(Primary.KPI=='videoviews', VCR,
+                                                         ifelse(Primary.KPI=='traffic', CTR, 'null'))))
+
+final_social_ren$cost.per.bm <- with(final_social_ren, ifelse(Primary.KPI=='engagement', CPE,
+                                                  ifelse(Primary.KPI=='videoviews', CPCV,
+                                                         ifelse(Primary.KPI=='traffic', CPC, 'null'))))
+
+final_social_ren
+
+##Reorder columns; clean up document
+colnames <- c("Channel", "Primary.KPI", "Region", "Delivery.Market", "Site.Name", "1P.Targeting.Partner", "1P.Targeting.Detail", "Additional.Detail", "Format", "Creative.Format.x", "Size.Length.x", "Phase", "Presence.of.brand", "Call.To.Action","Clicks", "Impressions", "Video.Completions", "Post.Engagement", "Spend", "Rate","rate.bm","Cost.Per","cost.per.bm")
+
+final_social_ren
+
+social_8.5 <- final_social_ren[, colnames]
+
+social_8.5
+
+##Write CSV
+write.csv(social_8.5,"social_8.5.20.csv")
+
+
+
+```
+
+
+##Second Data Doc Tab: Programmatic
+```{r}
+##Programmatic (Renaissance)
+
+
+##Programmatic (Renaissance) -- start selecting fields needed within the data doc, and filter for programmatic
+programmatic_v1 <- input_file %>% select(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.,Impressions, Clicks,Video.Completions, X_Spend..EUR.) %>% filter(Site.Name=="Cadreon")
+
+
+##Aggregate data by requisite fields so data is NOT broken out by day
+programmatic <- programmatic_v1 %>%  group_by(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.) %>%
+  summarise_all(funs(sum))
+
+##Test file
+programmatic
+
+##Add type of metric that qualifies as KPI based on objective - in this case, we're looking at FORMAT - banners v. videos to decide how the data populates
+programmatic$Type <- with(programmatic, ifelse(
+  Creative.Format..Placement.MD. =='video', 'VCR', 
+  ifelse(Creative.Format..Placement.MD. =='banner', 'CTR', 'null')))
+
+##Calculate KPI based on objective
+programmatic$Rate <- with(programmatic, ifelse(
+  Creative.Format..Placement.MD. =='video', round(Video.Completions/Impressions, digits=2), 
+  ifelse(Creative.Format..Placement.MD. =='banner', round(Clicks/Impressions, digits=2), 'null')))
+
+##Check file
+programmatic
+
+##Clean up column names
+library(plyr)
+
+programmatic <- rename_all(programmatic, recode, Channel..Placement.MD. = "Channel", Primary.KPI..Placement.MD.="Primary.KPI", X_Region..Clean.= "Region", X_Market.ISO.Code..Clean.= "Delivery.Market", Site.Name="Site.Name", Creative.Format..Placement.MD.="Format", Creative.Format..Creative.MD.="Creative.Format", Phase..Creative.Free.Form.MD.="Phase", Presence.Of.Brand..Creative.Free.Form.MD.="Presence.of.brand", Call.To.Action..Creative.Free.Form.MD.="Call.To.Action",Size.Length..Creative.MD.= "Size.Length", X_Spend..EUR.="Spend")
+  
+
+##Join benchmarks to social performance document
+
+
+mergeCols <- c("Delivery.Market", "Creative.Format","Site.Name")
+
+final_programmatic <- left_join(programmatic, overall, by = mergeCols)
+
+##Test file
+final_programmatic
+
+##Populate benchmarks based on campaign KPI
+final_programmatic$Rate.BM <- with(final_programmatic, ifelse(Creative.Format =='video', VCR, 
+  ifelse(Creative.Format =='banner', CTR, 'null')))
+
+final_programmatic
+
+##Reorder columns; clean up document
+colnames <- c("Channel", "Primary.KPI.x", "Region", "Delivery.Market", "Site.Name", "Format", "Creative.Format", "Phase", "Presence.of.brand", "Call.To.Action","Size.Length.y","Clicks", "Impressions", "Video.Completions", "Spend", "Rate","Rate.BM")
+
+programmatic_8.5 <- final_programmatic[, colnames]
+
+##Publish file
+write.csv(programmatic_8.5,"programmatic_8.5.20.csv")
+
+```
+
+##Third Data Doc Tab: Digital Audio
+```{r}
+
+##DigitalAudio (Renaissance) - select fields needed for audio performance
+aud_v1 <- input_file %>% select(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.,Impressions, Clicks) %>% filter(Channel..Placement.MD.== "digitalaudio")
+
+aud <- aud_v1 %>%  group_by(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.) %>%
+  summarise_all(funs(sum))
+
+
+##Add type of metric that qualifies as KPI based on objective
+aud$Type <- 'Impressions'
+
+
+##Clean up column names
+library(plyr)
+
+audio_final <- rename_all(aud, recode, Channel..Placement.MD. = "Channel", Primary.KPI..Placement.MD.="Primary.KPI", X_Region..Clean.= "Region", X_Market.ISO.Code..Clean.= "Delivery.Market", Site.Name="Site.Name", Creative.Format..Placement.MD.="Format", Creative.Format..Creative.MD.="Creative.Format", Phase..Creative.Free.Form.MD.="Phase", Presence.Of.Brand..Creative.Free.Form.MD.="Presence.of.brand", Call.To.Action..Creative.Free.Form.MD.="Call.To.Action",Size.Length..Creative.MD.= "Size.Length")
+  
+
+##Reorder columns; clean up document
+colnames <- c("Channel", "Primary.KPI", "Region", "Delivery.Market", "Site.Name", "Format", "Creative.Format", "Phase", "Presence.of.brand", "Call.To.Action","Size.Length","Clicks", "Impressions")
+
+audio_8.5 <- audio_final[, colnames]
+
+##Publish file
+write.csv(audio_8.5,"audio_8.5.20.csv")
+```
+
+
+##Final Data Doc Tab: Direct Partners (OLV + Display)
+
+
+```{r}
+
+##OLV + Display (Renaissance)
+
+
+##OLV+Display
+olvdisplay_v1 <- input_file %>% select(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.,Impressions, Clicks,Video.Completions) %>% filter(Channel..Placement.MD.=="olv" | Channel..Placement.MD. =="display" & Site.Name !="Cadreon")
+
+olvdisplay <- olvdisplay_v1 %>%  group_by(Channel..Placement.MD., Primary.KPI..Placement.MD., X_Region..Clean., X_Market.ISO.Code..Clean., Site.Name, Creative.Format..Placement.MD., Creative.Format..Creative.MD., Phase..Creative.Free.Form.MD., Presence.Of.Brand..Creative.Free.Form.MD., Call.To.Action..Creative.Free.Form.MD.,Size.Length..Creative.MD.) %>%
+  summarise_all(funs(sum))
+
+
+##Add type of metric that qualifies as KPI based on objective
+olvdisplay$Type <- with(olvdisplay, ifelse(
+  Creative.Format..Placement.MD. =='video', 'VCR', 
+  ifelse(Creative.Format..Placement.MD. =='banner', 'CTR', 'null')))
+
+##Calculate KPI based on objective
+olvdisplay$Rate <- with(olvdisplay, ifelse(
+  Creative.Format..Placement.MD. =='video', round(Video.Completions/Impressions, digits=2), 
+  ifelse(Creative.Format..Placement.MD. =='banner', round(Clicks/Impressions, digits=2), 'null')))
+
+##Check file
+olvdisplay
+
+##Clean up column names
+library(plyr)
+
+olvdisplay <- rename_all(programmatic, recode, Channel..Placement.MD. = "Channel", Primary.KPI..Placement.MD.="Primary.KPI", X_Region..Clean.= "Region", X_Market.ISO.Code..Clean.= "Delivery.Market", Site.Name="Site.Name", Creative.Format..Placement.MD.="Format", Creative.Format..Creative.MD.="Creative.Format", Phase..Creative.Free.Form.MD.="Phase", Presence.Of.Brand..Creative.Free.Form.MD.="Presence.of.brand", Call.To.Action..Creative.Free.Form.MD.="Call.To.Action",Size.Length..Creative.MD.= "Size.Length")
+  
+
+##Join benchmarks to social performance document
+
+
+mergeCols <- c("Delivery.Market", "Creative.Format","Site.Name")
+
+
+
+final_olvdisplay <- left_join(olvdisplay, overall, by = mergeCols)
+
+
+final_olvdisplay
+
+##Populate benchmarks based on campaign KPI
+final_olvdisplay$Rate.BM <- with(final_olvdisplay, ifelse(Creative.Format =='video', VCR, 
+  ifelse(Creative.Format =='banner', CTR, 'null')))
+
+final_olvdisplay
+
+##Reorder columns; clean up document
+colnames <- c("Channel", "Primary.KPI.x", "Region", "Delivery.Market", "Site.Name", "Format", "Creative.Format", "Phase", "Presence.of.brand", "Call.To.Action","Size.Length.y","Clicks", "Impressions", "Video.Completions", "Rate","Rate.BM")
+
+olvdisplay_8.5 <- final_olvdisplay[, colnames]
+
+olvdisplay_8.5
+
+
+write.csv(olvdisplay_8.5,"olvdisplay_8.5.20.csv")
